@@ -1,5 +1,7 @@
 package com.company;
 
+import java.util.Arrays;
+
 public class Parser {
 
         String commandName;
@@ -10,9 +12,10 @@ public class Parser {
         public boolean parse(String input)
         {
             // set the local args equal to what the user input
+            String[] currentWords = input.split(" ");
 
-            // Return true if everything is okay
-            // otherwise false
+            commandName = currentWords[0];
+            args = Arrays.copyOfRange(currentWords, 1, currentWords.length);
             return true;
         }
 
