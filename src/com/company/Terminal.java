@@ -6,7 +6,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
-import java.sql.SQLOutput;
 import java.util.Arrays;
 import java.util.Scanner;
 import java.nio.file.Path;
@@ -22,24 +21,20 @@ class Parser {
     //where "input" is the string command entered by the user
     public boolean parse(String input)
     {
-        // set the local args equal to what the user input
-        String[] currentWords = input.split(" ");
-
-        commandName = currentWords[0];
-        args = Arrays.copyOfRange(currentWords, 1, currentWords.length);
+        input = input.trim();
+        String[] inputWords = input.split(" ");
+        commandName = inputWords[0];
+        args = Arrays.copyOfRange(inputWords, 1, inputWords.length);
         return true;
     }
 
-    public String getCommandName()
-    {
-        //
-        return commandName;
-    }
+    public String getCommandName() { return commandName; }
 
     public String[] getArgs()
     {
         return args;
     }
+    public boolean hasArgs() { return args.length > 0; }
 }
 
 
@@ -47,11 +42,15 @@ public class Terminal {
 
     Scanner inputScanner;
     Parser parser;
-    boolean shouldExit = false;
     Path currentPath;
+    boolean shouldExit = false;
 
-    public void showErrorMessage() {
+    private void printErrorMessage() {
         System.out.println("Error: Command not found or invalid parameters are entered!");
+    }
+
+    private void printIgnoreArgs() {
+        System.out.println("Ignoring non-option arguments");
     }
 
     public boolean isValidPath(String path) {
@@ -66,7 +65,7 @@ public class Terminal {
 
     public void echo(String[] args) {
         if (args.length == 0) {
-            showErrorMessage();
+            printErrorMessage();
             return;
         }
 
@@ -76,7 +75,10 @@ public class Terminal {
         System.out.println(stringToPrint);
     }
 
-    public void pwd() {
+    public void pwd()
+    {
+        if(parser.hasArgs())
+            printIgnoreArgs();
         System.out.println(currentPath.toAbsolutePath().toString());
     }
 
@@ -86,43 +88,48 @@ public class Terminal {
         else if (args.length == 1) {
             String arg = args[0];
             if (arg.equals("..")) {
-                currentPath = currentPath.getParent().toAbsolutePath();
+                try {
+                    currentPath = currentPath.getParent().toAbsolutePath();
+                }
+                catch(NullPointerException ex) {
+                    System.out.println("You are already at the root directory.");
+                }
             } else {
                 if (isValidPath(arg)) {
-                    currentPath = currentPath.resolve(arg);
+                    Path newPath = currentPath.resolve(arg);
+                    if(Files.exists(newPath))
+                        currentPath = newPath;
+                    else
+                        System.out.println("Directory does not exist.");
                 } else {
                     System.out.println("Not a valid path.");
                     return;
                 }
             }
         } else {
-            showErrorMessage();
+            printErrorMessage();
             return;
         }
 
         System.out.println("Current Path: " + currentPath.toString());
     }
 
-    public void ls() {
+    public void ls(boolean reversed) {
         String[] files;
         File file = currentPath.toFile();
         files = file.list();
         Arrays.sort(files);
-        for (int i = 0; i < files.length; i++) {
-            System.out.print(files[i] + " ");
+        if(reversed)
+        {
+            for (int i = files.length - 1; i >= 0; i--) {
+                System.out.print(files[i] + " \n");
+            }
         }
-        System.out.println();
-    }
-
-    public void ls_r() {
-        String[] files;
-        File file = currentPath.toFile();
-        files = file.list();
-        Arrays.sort(files);
-        for (int i = files.length - 1; i >= 0; i--) {
-            System.out.print(files[i] + " ");
+        else {
+            for (int i = 0; i < files.length; i++) {
+                System.out.print(files[i] + " \n");
+            }
         }
-        System.out.println();
     }
 
     public void mkdir(String[] string) {
@@ -199,7 +206,6 @@ public class Terminal {
         }
     }
 
-
     public void rmdir(String[] string) {
         File[] files;
         if (string[0].equals("*")) {
@@ -264,10 +270,8 @@ public class Terminal {
         Path firstDir = currentPath.resolve(string[1]);
         Path secondDir = currentPath.resolve(string[2]).resolve(firstDir.getFileName());
 
-
         try (Stream<Path> stream = Files.walk(firstDir)) {
             stream.forEachOrdered(sourcePath -> {
-
                 try {
                     Files.copy(sourcePath, secondDir.resolve(firstDir.relativize(sourcePath)));
                 } catch (IOException e) {
@@ -276,11 +280,9 @@ public class Terminal {
                 }
             });
         } catch (IOException e) {
-          //  System.out.println("Error while copying");
             e.printStackTrace();
         }
     }
-
 
     //This method will choose the suitable command method to be called
     public void chooseCommandAction() {
@@ -301,9 +303,9 @@ public class Terminal {
                 break;
             case "ls":
                 if (parser.args.length == 1 && parser.args[0].equals("-r")) {
-                    ls_r();
+                    ls(true);
                 } else {
-                    ls();
+                    ls(false);
                 }
                 break;
             case "mkdir":
@@ -328,10 +330,8 @@ public class Terminal {
             case "cat":
                 cat(parser.args);
                 break;
-
-
             default:
-                showErrorMessage();
+                printErrorMessage();
                 break;
         }
     }
